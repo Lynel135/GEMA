@@ -100,8 +100,12 @@ class LocationViewModel extends StateNotifier<LocationState> {
       nearestPerlintasan: nearest,
     );
 
-    // Send to backend (mocking masinisId for now)
-    _apiService.sendLocationUpdate('masinis-001', position.latitude, position.longitude);
+    // Send location to backend
+    _apiService.updateLocation(
+      pengendaraId: 'pengendara-001',
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
   }
 
   void dismissAlert() {

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../core/theme.dart';
 import '../viewmodels/location_viewmodel.dart';
 import 'widgets/emergency_alert_modal.dart';
-import '../services/api_service.dart';
 
 class DashboardView extends ConsumerStatefulWidget {
   const DashboardView({super.key});
@@ -15,75 +15,96 @@ class DashboardView extends ConsumerStatefulWidget {
 }
 
 class _DashboardViewState extends ConsumerState<DashboardView> {
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
 
   @override
   Widget build(BuildContext context) {
     final locationState = ref.watch(locationViewModelProvider);
-    final initialCameraPosition = const CameraPosition(
-      target: LatLng(-6.200000, 106.816666), // Default to Jakarta
-      zoom: 14,
-    );
 
-    // Update map camera if location changes
-    if (locationState.currentPosition != null && _mapController != null) {
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLng(
+    // Listen for location changes to update map camera position
+    ref.listen<LocationState>(locationViewModelProvider, (previous, next) {
+      if (next.currentPosition != null &&
+          (previous?.currentPosition?.latitude !=
+                  next.currentPosition?.latitude ||
+              previous?.currentPosition?.longitude !=
+                  next.currentPosition?.longitude)) {
+        _mapController.move(
           LatLng(
-            locationState.currentPosition!.latitude,
-            locationState.currentPosition!.longitude,
+            next.currentPosition!.latitude,
+            next.currentPosition!.longitude,
           ),
-        ),
-      );
-    }
+          14.0,
+        );
+      }
+    });
 
-    Set<Marker> markers = {};
+    final List<Marker> mapMarkers = [];
+
+    // Add user marker
     if (locationState.currentPosition != null) {
-      markers.add(
+      mapMarkers.add(
         Marker(
-          markerId: const MarkerId('current_location'),
-          position: LatLng(
+          point: LatLng(
             locationState.currentPosition!.latitude,
             locationState.currentPosition!.longitude,
           ),
-          infoWindow: const InfoWindow(title: 'Lokasi Anda'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+          width: 45,
+          height: 45,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.blue.withAlpha(51),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.my_location, color: Colors.blue, size: 28),
+          ),
         ),
       );
     }
 
+    // Add crossing markers
     for (var p in locationState.perlintasanList) {
-      markers.add(
+      mapMarkers.add(
         Marker(
-          markerId: MarkerId(p.id),
-          position: LatLng(p.latitude, p.longitude),
-          infoWindow: InfoWindow(title: p.nama),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          point: LatLng(p.latitude, p.longitude),
+          width: 40,
+          height: 40,
+          child: const Icon(Icons.train, color: Colors.red, size: 32),
         ),
       );
     }
+
+    final initialCenter = LatLng(-7.6709, 109.6608); // Default to Kebumen
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('GEMA Dashboard'),
-      ),
+      appBar: AppBar(title: const Text('GEMA Dashboard')),
       body: Stack(
         children: [
           Column(
             children: [
-              // Top Section: Map
+              // Top Section: Map (OpenStreetMap - Free)
               Expanded(
                 flex: 6,
                 child: Stack(
                   children: [
-                    GoogleMap(
-                      initialCameraPosition: initialCameraPosition,
-                      myLocationEnabled: true,
-                      myLocationButtonEnabled: true,
-                      markers: markers,
-                      onMapCreated: (controller) {
-                        _mapController = controller;
-                      },
+                    FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: locationState.currentPosition != null
+                            ? LatLng(
+                                locationState.currentPosition!.latitude,
+                                locationState.currentPosition!.longitude,
+                              )
+                            : initialCenter,
+                        initialZoom: 14.0,
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'id.ac.gema.app',
+                        ),
+                        MarkerLayer(markers: mapMarkers),
+                      ],
                     ),
                     // Status Indicator
                     Positioned(
@@ -91,22 +112,33 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                       left: 16,
                       right: 16,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 16,
+                        ),
                         decoration: BoxDecoration(
-                          color: locationState.isDanger ? AppTheme.dangerColor : AppTheme.safeColor,
+                          color: locationState.isDanger
+                              ? AppTheme.dangerColor
+                              : AppTheme.safeColor,
                           borderRadius: BorderRadius.circular(8),
-                          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black26, blurRadius: 4),
+                          ],
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              locationState.isDanger ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                              locationState.isDanger
+                                  ? Icons.warning_amber_rounded
+                                  : Icons.check_circle_outline,
                               color: Colors.white,
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              locationState.isDanger ? 'Status: Area Bahaya' : 'Status: Area Aman',
+                              locationState.isDanger
+                                  ? 'Status: Area Bahaya'
+                                  : 'Status: Area Aman',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -126,9 +158,15 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                 child: Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
                     boxShadow: [
-                      BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -5))
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 10,
+                        offset: Offset(0, -5),
+                      ),
                     ],
                   ),
                   child: Column(
@@ -138,7 +176,9 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                         padding: const EdgeInsets.all(16),
                         decoration: const BoxDecoration(
                           color: Color(0xFF333333),
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(24),
+                          ),
                         ),
                         child: const Text(
                           'Perlintasan Terdekat',
@@ -157,7 +197,8 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                 padding: const EdgeInsets.all(16),
                                 itemCount: locationState.perlintasanList.length,
                                 itemBuilder: (context, index) {
-                                  final p = locationState.perlintasanList[index];
+                                  final p =
+                                      locationState.perlintasanList[index];
                                   String distanceStr = '';
                                   if (locationState.currentPosition != null) {
                                     final dist = Geolocator.distanceBetween(
@@ -166,25 +207,42 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                       p.latitude,
                                       p.longitude,
                                     );
-                                    distanceStr = '${(dist / 1000).toStringAsFixed(1)} km';
+                                    distanceStr =
+                                        '${(dist / 1000).toStringAsFixed(1)} km';
                                   }
 
                                   return Card(
                                     elevation: 2,
                                     margin: const EdgeInsets.only(bottom: 12),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                     child: ListTile(
                                       leading: Container(
                                         width: 48,
                                         height: 48,
                                         decoration: BoxDecoration(
                                           color: Colors.grey[200],
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
-                                        child: const Icon(Icons.train, color: Colors.black54),
+                                        child: const Icon(
+                                          Icons.train,
+                                          color: Colors.black54,
+                                        ),
                                       ),
-                                      title: Text(p.nama, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                      subtitle: Text(distanceStr.isNotEmpty ? distanceStr : 'Menghitung jarak...'),
+                                      title: Text(
+                                        p.nama,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        distanceStr.isNotEmpty
+                                            ? distanceStr
+                                            : 'Menghitung jarak...',
+                                      ),
                                     ),
                                   );
                                 },
@@ -196,12 +254,10 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
               ),
             ],
           ),
-          
+
           // Emergency Alert Overlay
           if (locationState.isDanger)
-            const Positioned.fill(
-              child: EmergencyAlertModal(),
-            ),
+            const Positioned.fill(child: EmergencyAlertModal()),
         ],
       ),
     );

@@ -19,53 +19,74 @@ class Perlintasan {
   factory Perlintasan.fromJson(Map<String, dynamic> json) {
     return Perlintasan(
       id: json['id'],
-      nama: json['nama'],
-      latitude: json['latitude'],
-      longitude: json['longitude'],
+      nama: json['nama'] ?? json['nama_perlintasan'] ?? 'Perlintasan Tanpa Nama',
+      latitude: (json['latitude'] as num).toDouble(),
+      longitude: (json['longitude'] as num).toDouble(),
       radiusBahayaMeter: json['radius_bahaya_meter'] ?? 200,
     );
   }
 }
 
 class ApiService {
-  // Placeholder API URL
-  static const String baseUrl = 'https://mockapi.example.com/api/v1';
-  static const String apiKey = 'mock_api_key'; // Replace with actual key
+  // Endpoint URL terpisah
+  static const String getPerlintasanUrl = 'https://gemaback.up.railway.app/api/v1/perlintasan';
+  static const String postLocationUrl = 'https://gemaback.up.railway.app/api/v1/location/update';
+  
+  static const String apiKey = 'gema_4adb1708ab21735140a77fd474ad26b427d18c088ecf2bfe'; // Sesuai dengan konfigurasi .env backend
 
-  Future<bool> sendLocationUpdate(String masinisId, double lat, double lng) async {
+  static Map<String, String> get _headers => {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer $apiKey',
+  };
+
+  /// 1. Kirim update lokasi Pengendara secara real-time ke Backend
+  Future<bool> updateLocation({
+    required String pengendaraId,
+    required double latitude,
+    required double longitude,
+  }) async {
     try {
-      // Mock network delay
-      await Future.delayed(const Duration(milliseconds: 500));
-      print('Location sent to backend: $lat, $lng');
-      return true;
-      /*
       final response = await http.post(
-        Uri.parse('$baseUrl/location/update'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
+        Uri.parse(postLocationUrl),
+        headers: _headers,
         body: jsonEncode({
-          'masinis_id': masinisId,
-          'latitude': lat,
-          'longitude': lng,
+          'pengendara_id': pengendaraId,
+          'latitude': latitude,
+          'longitude': longitude,
           'timestamp': DateTime.now().toUtc().toIso8601String(),
         }),
       );
-      return response.statusCode == 200;
-      */
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+        return jsonResponse['status'] == 'success';
+      }
+      return false;
     } catch (e) {
-      print('Error sending location: $e');
+      print('Error updateLocation: $e');
       return false;
     }
   }
 
+  /// 2. Ambil daftar koordinat perlintasan kereta api
   Future<List<Perlintasan>> getPerlintasan() async {
     try {
-      // Mock network delay and data
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Return some dummy data for now
+      final response = await http.get(
+        Uri.parse(getPerlintasanUrl),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['status'] == 'success') {
+          final List<dynamic> data = jsonResponse['data'];
+          return data.map((e) => Perlintasan.fromJson(e)).toList();
+        }
+      }
+      throw Exception('Gagal memuat data perlintasan');
+    } catch (e) {
+      print('Error getPerlintasan: $e');
+      // Jika gagal, kembalikan daftar lokal dummy untuk kelangsungan aplikasi
       return [
         Perlintasan(
           id: '1',
@@ -82,25 +103,6 @@ class ApiService {
           radiusBahayaMeter: 200,
         ),
       ];
-
-      /*
-      final response = await http.get(
-        Uri.parse('$baseUrl/perlintasan'),
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-        },
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final List perlintasanList = data['data'];
-        return perlintasanList.map((e) => Perlintasan.fromJson(e)).toList();
-      } else {
-        throw Exception('Failed to load perlintasan');
-      }
-      */
-    } catch (e) {
-      print('Error fetching perlintasan: $e');
-      return [];
     }
   }
 }
