@@ -7,7 +7,8 @@ import '../services/location_service.dart';
 final locationServiceProvider = Provider((ref) => LocationService());
 final apiServiceProvider = Provider((ref) => ApiService());
 
-final locationViewModelProvider = StateNotifierProvider<LocationViewModel, LocationState>((ref) {
+final locationViewModelProvider =
+    StateNotifierProvider<LocationViewModel, LocationState>((ref) {
   return LocationViewModel(
     ref.read(locationServiceProvider),
     ref.read(apiServiceProvider),
@@ -18,12 +19,14 @@ class LocationState {
   final Position? currentPosition;
   final List<Perlintasan> perlintasanList;
   final bool isDanger;
+  final bool showDangerAlert;
   final Perlintasan? nearestPerlintasan;
 
   LocationState({
     this.currentPosition,
     this.perlintasanList = const [],
     this.isDanger = false,
+    this.showDangerAlert = false,
     this.nearestPerlintasan,
   });
 
@@ -31,12 +34,14 @@ class LocationState {
     Position? currentPosition,
     List<Perlintasan>? perlintasanList,
     bool? isDanger,
+    bool? showDangerAlert,
     Perlintasan? nearestPerlintasan,
   }) {
     return LocationState(
       currentPosition: currentPosition ?? this.currentPosition,
       perlintasanList: perlintasanList ?? this.perlintasanList,
       isDanger: isDanger ?? this.isDanger,
+      showDangerAlert: showDangerAlert ?? this.showDangerAlert,
       nearestPerlintasan: nearestPerlintasan ?? this.nearestPerlintasan,
     );
   }
@@ -46,35 +51,35 @@ class LocationViewModel extends StateNotifier<LocationState> {
   final LocationService _locationService;
   final ApiService _apiService;
   StreamSubscription<Position>? _positionSubscription;
+  bool _alertAcknowledged = false;
 
-  LocationViewModel(this._locationService, this._apiService) : super(LocationState()) {
+  LocationViewModel(this._locationService, this._apiService)
+      : super(LocationState()) {
     _init();
   }
 
   Future<void> _init() async {
-    // Fetch crossings
     final list = await _apiService.getPerlintasan();
     state = state.copyWith(perlintasanList: list);
 
-    // Get initial location
     final initialLoc = await _locationService.getCurrentLocation();
     if (initialLoc != null) {
       _processNewLocation(initialLoc);
     }
 
-    // Start stream
     final hasPermission = await _locationService.handlePermission();
     if (hasPermission) {
-      _positionSubscription = _locationService.getLocationStream().listen((Position position) {
-        _processNewLocation(position);
-      });
+      _positionSubscription =
+          _locationService.getLocationStream().listen(_processNewLocation);
     }
   }
 
   void _processNewLocation(Position position) {
-    bool danger = false;
+    var danger = false;
     Perlintasan? nearest;
     double minDistance = double.infinity;
+    const enterThreshold = 1.0;
+    const exitThreshold = 1.15;
 
     for (var p in state.perlintasanList) {
       final distance = Geolocator.distanceBetween(
@@ -89,23 +94,37 @@ class LocationViewModel extends StateNotifier<LocationState> {
         nearest = p;
       }
 
-      if (distance <= p.radiusBahayaMeter) {
+      final radius = p.radiusBahayaMeter.toDouble();
+      final threshold =
+          state.isDanger ? radius * exitThreshold : radius * enterThreshold;
+      if (distance <= threshold) {
         danger = true;
       }
+    }
+
+    if (!danger) {
+      _alertAcknowledged = false;
+    } else if (!state.isDanger) {
+      _alertAcknowledged = false;
     }
 
     state = state.copyWith(
       currentPosition: position,
       isDanger: danger,
+      showDangerAlert: danger && !_alertAcknowledged,
       nearestPerlintasan: nearest,
     );
 
-    // Send to backend (mocking masinisId for now)
-    _apiService.sendLocationUpdate('masinis-001', position.latitude, position.longitude);
+    _apiService.sendLocationUpdate(
+      'masinis-001',
+      position.latitude,
+      position.longitude,
+    );
   }
 
   void dismissAlert() {
-    state = state.copyWith(isDanger: false);
+    _alertAcknowledged = true;
+    state = state.copyWith(showDangerAlert: false);
   }
 
   @override

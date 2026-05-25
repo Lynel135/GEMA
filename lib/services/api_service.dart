@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class Perlintasan {
@@ -19,26 +20,26 @@ class Perlintasan {
   factory Perlintasan.fromJson(Map<String, dynamic> json) {
     return Perlintasan(
       id: json['id'],
-      nama: json['nama'],
-      latitude: json['latitude'],
-      longitude: json['longitude'],
+      nama:
+          json['nama'] ?? json['nama_perlintasan'] ?? 'Perlintasan Tanpa Nama',
+      latitude: (json['latitude'] as num).toDouble(),
+      longitude: (json['longitude'] as num).toDouble(),
       radiusBahayaMeter: json['radius_bahaya_meter'] ?? 200,
     );
   }
 }
 
 class ApiService {
-  // Placeholder API URL
-  static const String baseUrl = 'https://mockapi.example.com/api/v1';
-  static const String apiKey = 'mock_api_key'; // Replace with actual key
+  static const String baseUrl = 'https://gemaback.up.railway.app/api/v1';
+  static const String apiKey =
+      'gema_4535e37a8a16d2f51d9eb01f5e3e6f7db4f06f8f252a2198'; // NOTE: Replace with the full unmasked token key if '...' is present
 
-  Future<bool> sendLocationUpdate(String masinisId, double lat, double lng) async {
+  Future<bool> sendLocationUpdate(
+    String masinisId,
+    double lat,
+    double lng,
+  ) async {
     try {
-      // Mock network delay
-      await Future.delayed(const Duration(milliseconds: 500));
-      print('Location sent to backend: $lat, $lng');
-      return true;
-      /*
       final response = await http.post(
         Uri.parse('$baseUrl/location/update'),
         headers: {
@@ -52,54 +53,29 @@ class ApiService {
           'timestamp': DateTime.now().toUtc().toIso8601String(),
         }),
       );
-      return response.statusCode == 200;
-      */
+      debugPrint('Location sent to backend: ${response.statusCode}');
+      return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      print('Error sending location: $e');
+      debugPrint('Error sending location: $e');
       return false;
     }
   }
 
   Future<List<Perlintasan>> getPerlintasan() async {
     try {
-      // Mock network delay and data
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Return some dummy data for now
-      return [
-        Perlintasan(
-          id: '1',
-          nama: 'Perlintasan Sudirman',
-          latitude: -6.205,
-          longitude: 106.820,
-          radiusBahayaMeter: 200,
-        ),
-        Perlintasan(
-          id: '2',
-          nama: 'Perlintasan Thamrin',
-          latitude: -6.195,
-          longitude: 106.823,
-          radiusBahayaMeter: 200,
-        ),
-      ];
-
-      /*
       final response = await http.get(
         Uri.parse('$baseUrl/perlintasan'),
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-        },
+        headers: {'Authorization': 'Bearer $apiKey'},
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List perlintasanList = data['data'];
         return perlintasanList.map((e) => Perlintasan.fromJson(e)).toList();
       } else {
-        throw Exception('Failed to load perlintasan');
+        throw Exception('Failed to load perlintasan: ${response.statusCode}');
       }
-      */
     } catch (e) {
-      print('Error fetching perlintasan: $e');
+      debugPrint('Error fetching perlintasan: $e');
       return [];
     }
   }

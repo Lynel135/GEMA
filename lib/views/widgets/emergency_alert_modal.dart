@@ -9,13 +9,15 @@ class EmergencyAlertModal extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      color: AppTheme.dangerColor.withOpacity(0.85),
+      color: Colors.transparent,
       child: Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Card(
             elevation: 8,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
@@ -24,15 +26,22 @@ class EmergencyAlertModal extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 48),
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.amber,
+                        size: 48,
+                      ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Text(
                           'Anda mendekati perlintasan kereta api',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.dangerColor,
-                          ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.dangerColor,
+                              ),
                         ),
                       ),
                     ],
@@ -46,8 +55,8 @@ class EmergencyAlertModal extends ConsumerWidget {
                   Text(
                     'Langkah Aman:',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 8),
                   _buildChecklistItem('Kurangi kecepatan'),
@@ -64,11 +73,16 @@ class EmergencyAlertModal extends ConsumerWidget {
                       ),
                     ),
                     onPressed: () {
-                      ref.read(locationViewModelProvider.notifier).dismissAlert();
+                      ref
+                          .read(locationViewModelProvider.notifier)
+                          .dismissAlert();
                     },
                     child: const Text(
                       'OKE, SAYA MENGERTI',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
